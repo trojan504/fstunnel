@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to rebuild from main
+        description: Release tag to build from main
         required: true
         default: v3.0.0
         type: string
@@ -44,9 +44,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
-          source_sha=$(git rev-parse HEAD)
-          gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" --method PATCH -f "sha=$source_sha" -F force=true
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            source_sha=$(git rev-parse HEAD)
+            gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" --method PATCH -f "sha=$source_sha" -F force=true
+          else
+            echo "No existing release found; the release action will create the initial tag and release."
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
