@@ -143,7 +143,7 @@ jobs:
           ARCHIVE: ${{ steps.source.outputs.archive }}
         run: |
           set -euo pipefail
-          rsync -a --delete --exclude='/.git/' --exclude='/dist/' --exclude='/.github/workflows/prepare-release.yml' \
+          rsync -a --delete --exclude='/.git/' --exclude='/dist/' --exclude='/.github/workflows/prepare-release.yml' --exclude='/.github/workflows/release.yml' \
             "$RUNNER_TEMP/source/fstunnel-main/" "$GITHUB_WORKSPACE/"
           rm -f "$ARCHIVE"
           git diff --check
