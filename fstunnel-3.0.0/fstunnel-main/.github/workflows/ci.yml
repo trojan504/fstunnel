@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go test -race ./cmd/fstunnel-engine ./pkg/tunnel
+      - run: shellcheck install.sh scripts/*.sh
+      - run: python3 -m unittest discover -s tests -v
+
+  kernel-gre:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build current and 0.2.0 engines
+        run: |
+          mkdir -p "$RUNNER_TEMP/gre-old"
+          git archive v0.2.0 | tar -x -C "$RUNNER_TEMP/gre-old"
+          go build -o "$RUNNER_TEMP/engine-fixed" ./cmd/fstunnel-engine
+          (cd "$RUNNER_TEMP/gre-old" && go build -o "$RUNNER_TEMP/engine-old" ./cmd/fstunnel-engine)
+      - name: Reproduce 0.2.0 GRE regression in isolated namespaces
+        run: |
+          set +e
+          sudo timeout 60 unshare --mount --net --pid --fork --mount-proc env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin FSTUNNEL_TEST_NETNS=1 bash tests/integration-gre.sh "$RUNNER_TEMP/engine-old" "$PWD/scripts/fstunnel-kernel.sh"
+          result=$?
+          set -e
+          test "$result" -eq 42
+      - name: Verify fixed DIRECT and REVERSE GRE with real kernel devices
+        run: sudo timeout 60 unshare --mount --net --pid --fork --mount-proc env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin FSTUNNEL_TEST_NETNS=1 bash tests/integration-gre.sh "$RUNNER_TEMP/engine-fixed" "$PWD/scripts/fstunnel-kernel.sh"
+

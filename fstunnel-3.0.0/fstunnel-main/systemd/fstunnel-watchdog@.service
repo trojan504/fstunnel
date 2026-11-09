@@ -1,0 +1,17 @@
+[Unit]
+Description=fstunnel end-to-end watchdog %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/fstunnel/fstunnel-watchdog %i
+TimeoutStartSec=75
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RuntimeDirectory=fstunnel-watchdog
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ReadWritePaths=/run/fstunnel-watchdog

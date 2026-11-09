@@ -1,0 +1,8 @@
+// Package version holds the release version, overridable at build time with
+// -ldflags "-X fstunnel/pkg/version.Version=0.1.1".
+package version
+
+var Version = "3.0.0"
+
+// Telegram is the project channel shown in the CLI and the web panel.
+const Telegram = "https://t.me/CiAUB_CH"

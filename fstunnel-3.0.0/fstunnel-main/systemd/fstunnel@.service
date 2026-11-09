@@ -1,0 +1,13 @@
+[Unit]
+Description=fstunnel kernel tunnel %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/fstunnel/fstunnel-kernel up %i
+ExecStop=/usr/local/lib/fstunnel/fstunnel-kernel down %i
+
+[Install]
+WantedBy=multi-user.target

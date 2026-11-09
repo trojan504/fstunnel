@@ -1,0 +1,19 @@
+
+--------------------------------------------------------------------------------
+Third-party code
+--------------------------------------------------------------------------------
+
+The Manage menu and the features behind it — Manage Tunnels, Status, Health
+Check, Exit Health, Tunnel Metrics, Restart All, Auto Refresh, the Built-in
+SOCKS5/HTTP Proxy and File Locations — are taken from BackPack (AGPL-3.0),
+adapted to fstunnel. BackPack's IP Spoofing Tester is not included.
+The ported files say so at the top: pkg/cli/manage.go, pkg/cli/health.go,
+pkg/socks, pkg/localproxy, pkg/schedule and pkg/netscore.
+
+BackPack's NOTICE requires this line to stay visible and unaltered:
+
+  Based on BackPack by Amin Mohammadi (AminMGMT)
+  https://github.com/AminMGMT/BackPack
+
+"BackPack" is a mark of Amin Mohammadi (AminMGMT); fstunnel is a separate
+project with its own name and is not BackPack.
