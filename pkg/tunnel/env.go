@@ -52,6 +52,9 @@ func Env(tc catalog.TunnelConfig) string {
 	} else {
 		put("REVERSE", 0)
 	}
+	if tc.Reverse && tc.CarrierTLS {
+		put("CARRIER_TLS", 1)
+	}
 	put("FORWARDS", strings.Join(tc.Ports, " "))
 	switch tc.Method {
 	case "wireguard":

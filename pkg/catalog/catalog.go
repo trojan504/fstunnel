@@ -73,6 +73,18 @@ var Methods = []MethodSpec{
 	{ID: 28, Name: "openvpn-dco", Title: "OpenVPN P_DATA_V2 framing + AES-256-GCM", Family: FamilyUDPCrypt, Overhead: 61, NeedsPort: true, Userspace: true},
 }
 
+// Visible returns the methods offered in menus and connection tests: only the
+// FRP-compatible set (kernel L3/L2 carriers without IPv6 underlay).
+func Visible() []MethodSpec {
+	var out []MethodSpec
+	for _, m := range Methods {
+		if m.Family != FamilyUDPCrypt && m.Name != "wireguard" && !m.IPv6Underlay {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 func LookupMethod(nameOrID string) (MethodSpec, bool) {
 	q := strings.ToLower(strings.TrimSpace(nameOrID))
 	for _, m := range Methods {
@@ -104,8 +116,9 @@ type TunnelConfig struct {
 	Lanes          int      `json:"lanes,omitempty"`
 	RateMbps       int      `json:"rate_mbps,omitempty"`
 	Padding        int      `json:"padding,omitempty"`
-	Reverse        bool     `json:"reverse,omitempty"` // kharej initiates the connection to iran
-	Ports          []string `json:"ports,omitempty"`   // forwarded on the iran side: "443" or "2053=8443"
+	Reverse        bool     `json:"reverse,omitempty"`     // kharej initiates the connection to iran
+	CarrierTLS     bool     `json:"carrier_tls,omitempty"` // reverse carrier wrapped in TLS 1.3
+	Ports          []string `json:"ports,omitempty"`       // forwarded on the iran side: "443" or "2053=8443"
 	// BackupMethod is the method both servers switch to when this one stops
 	// carrying traffic (fstunnel agent); empty means no failover. BackupPort is
 	// its port, 0 for the method's default.
@@ -231,7 +244,7 @@ type Store struct {
 }
 
 const (
-	DefaultGitHubRepo = "https://github.com/CIAUB/fstunnel"
+	DefaultGitHubRepo = "https://github.com/trojan504/fstunnel"
 	DefaultPanelPort  = 6969
 )
 

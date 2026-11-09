@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"fstunnel/pkg/tls13"
 )
 
 // The carrier test speaks the same wire shape as the REVERSE TCP carrier of
@@ -122,6 +125,13 @@ func serveCarrier(c net.Conn) {
 	}
 }
 
+type tlsCtxKey struct{}
+
+// WithTLS returns a context whose carrier streams run inside TLS 1.3.
+func WithTLS(ctx context.Context) context.Context {
+	return context.WithValue(ctx, tlsCtxKey{}, true)
+}
+
 func dialCarrier(ctx context.Context, addr string, mode byte, prefix []byte) (net.Conn, error) {
 	if len(prefix) > 512 {
 		return nil, errors.New("carrier prefix too long")
@@ -132,6 +142,16 @@ func dialCarrier(ctx context.Context, addr string, mode byte, prefix []byte) (ne
 	}
 	if tc, ok := c.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
+	}
+	if on, _ := ctx.Value(tlsCtxKey{}).(bool); on {
+		tc := tls.Client(c, tls13.ClientConfig())
+		_ = tc.SetDeadline(time.Now().Add(3 * time.Second))
+		if err := tc.Handshake(); err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+		_ = tc.SetDeadline(time.Time{})
+		c = tc
 	}
 	hello := make([]byte, 32)
 	_, _ = rand.Read(hello)

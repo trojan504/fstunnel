@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	crand "crypto/rand"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -17,6 +18,7 @@ import (
 
 	"fstunnel/pkg/catalog"
 	"fstunnel/pkg/crypto"
+	"fstunnel/pkg/tls13"
 )
 
 const (
@@ -39,10 +41,11 @@ const (
 // the inner TCP fall back to fast retransmit and collapses throughput). Every stream
 // has its own queue and writer goroutine, so one slow stream never stalls the others.
 type revCarrier struct {
-	cfg    config
-	tx, rx *crypto.FastAEAD
-	dev    io.ReadWriteCloser
-	l2     bool // carrier device is a TAP (EoIP/EtherIP): frames start with Ethernet
+	tlsServer *tls.Config
+	cfg       config
+	tx, rx    *crypto.FastAEAD
+	dev       io.ReadWriteCloser
+	l2        bool // carrier device is a TAP (EoIP/EtherIP): frames start with Ethernet
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -139,7 +142,31 @@ func newRevCarrier(cfg config) (*revCarrier, error) {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &revCarrier{cfg: cfg, tx: tx, rx: rx, ctx: ctx, cancel: cancel, fatal: make(chan error, 1)}, nil
+	r := &revCarrier{cfg: cfg, tx: tx, rx: rx, ctx: ctx, cancel: cancel, fatal: make(chan error, 1)}
+	if cfg.tls {
+		cert, err := tls13.SelfSignedCert()
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+		r.tlsServer = tls13.ServerConfig(cert)
+	}
+	return r, nil
+}
+
+// carrierTLSServer wraps an accepted carrier socket in TLS 1.3 when enabled.
+func (r *revCarrier) carrierTLSServer(c net.Conn) (net.Conn, error) {
+	if !r.cfg.tls {
+		return c, nil
+	}
+	tc := tls.Server(c, r.tlsServer)
+	_ = tc.SetDeadline(time.Now().Add(10 * time.Second))
+	if err := tc.Handshake(); err != nil {
+		_ = c.Close()
+		return nil, err
+	}
+	_ = tc.SetDeadline(time.Time{})
+	return tc, nil
 }
 
 func tuneTCP(c net.Conn) {
@@ -446,7 +473,11 @@ func (r *revCarrier) serveListener(ln net.Listener, limit int) error {
 		case slots <- struct{}{}:
 			go func() {
 				defer func() { <-slots }()
-				r.serveConn(c, nil, nil)
+				sc, err := r.carrierTLSServer(c)
+				if err != nil {
+					return
+				}
+				r.serveConn(sc, nil, nil)
 			}()
 		default:
 			_ = c.Close()
@@ -485,6 +516,16 @@ func (r *revCarrier) dialKharej() error {
 			dialer := net.Dialer{Timeout: 5 * time.Second}
 			for r.ctx.Err() == nil {
 				c, err := dialer.DialContext(r.ctx, "tcp", target)
+				if err == nil && r.cfg.tls {
+					tc := tls.Client(c, tls13.ClientConfig())
+					_ = tc.SetDeadline(time.Now().Add(10 * time.Second))
+					if err = tc.Handshake(); err != nil {
+						_ = c.Close()
+					} else {
+						_ = tc.SetDeadline(time.Time{})
+						c = tc
+					}
+				}
 				if err != nil {
 					if !waitRetry(r.ctx, attempt) {
 						return

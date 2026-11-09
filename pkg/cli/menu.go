@@ -75,62 +75,32 @@ func RunInteractiveMenu() {
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
+// lastCarrierTLS records whether the last chooseMethod pick wraps the reverse
+// carrier in TLS 1.3.
+var lastCarrierTLS bool
+
 func chooseMethod() (catalog.MethodSpec, bool, bool) {
-	mode := ChooseOpt("Tunnel Mode", []MenuOpt{
-		{"DIRECT", "Standard tunnel (Iran connects directly to Kharej)"},
-		{"REVERSE", "Anti-DPI Reverse (Kharej dials into Iran; hides Kharej IP)"},
-	})
-	if mode == 0 {
-		return catalog.MethodSpec{}, false, false
-	}
-	reverse := (mode == 2)
-	Header()
-	var fam int
-	if reverse {
-		fam = ChooseOpt("Tunnel Layer (REVERSE)", []MenuOpt{
-			{"L3 kernel", "gre, 6to4, ipip, sit... inside the 8-stream TCP carrier; wireguard rides UDP"},
-			{"L2 kernel", "eoip, gretap, vxlan, geneve, l2tpv3, etherip inside the 8-stream TCP carrier"},
-			{"UDP-Crypt", "kharej dials UDP to iran; best on lossy or high-latency links (no TCP-in-TCP)"},
-		})
-	} else {
-		fam = ChooseOpt("Tunnel Layer (DIRECT)", []MenuOpt{
-			{"L3 kernel", "6to4, gre, ipip, wireguard, ipsec... fastest, no anti-DPI"},
-			{"L2 kernel", "eoip (MikroTik), gretap, vxlan, geneve, l2tpv3, etherip"},
-			{"UDP-Crypt", "encrypted UDP that looks like DTLS, QUIC, RTP, DNS..."},
-		})
-	}
-	if fam == 0 {
-		return catalog.MethodSpec{}, false, false
-	}
-	families := []catalog.Family{"", catalog.FamilyKernelL3, catalog.FamilyKernelL2, catalog.FamilyUDPCrypt}
-	var methods []catalog.MethodSpec
 	var opts []MenuOpt
-	for _, m := range catalog.Methods {
-		if m.Family == families[fam] && !(reverse && m.IPv6Underlay) {
-			methods = append(methods, m)
-			title, desc := m.Name, m.Title
-			if reverse {
-				if m.Family != catalog.FamilyUDPCrypt && m.Name != "wireguard" {
-					title = "frp+" + m.Name
-					desc = "TCP carrier (8 streams, TLS-shaped) + " + m.Title
-				} else {
-					title = "rev+" + m.Name
-					desc = "Reverse " + m.Title + " (Kharej dials into Iran)"
-				}
-			}
-			opts = append(opts, MenuOpt{Title: title, Desc: desc})
-		}
+	var order []catalog.MethodSpec
+	var tlsFlags []bool
+	for _, m := range catalog.Visible() {
+		opts = append(opts, MenuOpt{Title: "frp+" + m.Name, Desc: "TCP carrier (8 streams) + " + m.Title})
+		order = append(order, m)
+		tlsFlags = append(tlsFlags, false)
+		opts = append(opts, MenuOpt{Title: "tls13+" + m.Name, Desc: "TLS 1.3 (AEAD) carrier + " + m.Title})
+		order = append(order, m)
+		tlsFlags = append(tlsFlags, true)
+	}
+	if len(opts) == 0 {
+		return catalog.MethodSpec{}, false, false
 	}
 	Header()
-	methodTitle := "Method (DIRECT)"
-	if reverse {
-		methodTitle = "Method (REVERSE)"
-	}
-	i := ChooseOpt(methodTitle, opts)
+	i := ChooseOpt("Method (REVERSE)", opts)
 	if i == 0 {
 		return catalog.MethodSpec{}, false, false
 	}
-	return methods[i-1], reverse, true
+	lastCarrierTLS = tlsFlags[i-1]
+	return order[i-1], true, true
 }
 
 func askInt(prompt string, def int) int {
@@ -219,6 +189,7 @@ func setupWizard(role string) {
 	case m.SupportsFOU:
 		tc.Port = askInt("Wrap in UDP/FOU port (0 = off, raw IP)", 0)
 	}
+	tc.CarrierTLS = tc.Reverse && lastCarrierTLS
 	if m.Name == "eoip" {
 		tc.TunnelID = uint16(askInt("EoIP tunnel-id (must match MikroTik)", int(probe.TunnelID)))
 	}
@@ -612,6 +583,14 @@ func updateMenu() {
 		return
 	}
 	repo := strings.TrimRight(st.GitHubRepo, "/")
+	if strings.TrimPrefix(repo, "https://github.com/") == "CIAUB/fstunnel" {
+		st.GitHubRepo = catalog.DefaultGitHubRepo
+		if err := st.Save(); err != nil {
+			Err("Could not migrate the saved GitHub repository: " + err.Error())
+			return
+		}
+		repo = strings.TrimRight(st.GitHubRepo, "/")
+	}
 	Header()
 	Title("Update")
 	KV("Installed", version.Version)

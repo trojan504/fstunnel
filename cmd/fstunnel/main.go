@@ -86,7 +86,7 @@ func main() {
 		select {}
 
 	case "catalog", "methods":
-		for _, m := range catalog.Methods {
+		for _, m := range catalog.Visible() {
 			fmt.Printf("%2d  %-13s %-10s %s\n", m.ID, m.Name, m.Family, m.Title)
 		}
 

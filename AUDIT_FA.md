@@ -1,6 +1,6 @@
 # ممیزی fstunnel و اصلاح اتوماسیون شبکه
 
-مبنای بررسی: مخزن https://github.com/CIAUB/fstunnel ، شاخهٔ main، commit `7fe07e8189bf2a15402f5355be43584d974a2fa1`.
+مبنای بررسی: مخزن https://github.com/trojan504/fstunnel ، شاخهٔ main، commit `7fe07e8189bf2a15402f5355be43584d974a2fa1`.
 
 ## دامنه و تفاوت معماری
 

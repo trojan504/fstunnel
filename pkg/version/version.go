@@ -2,7 +2,7 @@
 // -ldflags "-X fstunnel/pkg/version.Version=0.1.1".
 package version
 
-var Version = "3.0.0"
+var Version = "3.0.8"
 
 // Telegram is the project channel shown in the CLI and the web panel.
 const Telegram = "https://t.me/CiAUB_CH"

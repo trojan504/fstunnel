@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/CIAUB/fstunnel/releases/latest"><img src="https://img.shields.io/github/v/release/CIAUB/fstunnel?color=b91c1c&label=release" alt="Release"></a>
-  <a href="https://github.com/CIAUB/fstunnel/actions/workflows/ci.yml"><img src="https://github.com/CIAUB/fstunnel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/trojan504/fstunnel/releases/latest"><img src="https://img.shields.io/github/v/release/CIAUB/fstunnel?color=b91c1c&label=release" alt="Release"></a>
+  <a href="https://github.com/trojan504/fstunnel/actions/workflows/ci.yml"><img src="https://github.com/trojan504/fstunnel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white" alt="Go 1.22">
   <img src="https://img.shields.io/badge/Linux-amd64%20%7C%20arm64%20%7C%20armv7-333?logo=linux&logoColor=white" alt="Linux amd64 | arm64 | armv7">
   <a href="https://t.me/CiAUB_CH"><img src="https://img.shields.io/badge/Telegram-@CiAUB__CH-26A5E4?logo=telegram&logoColor=white" alt="Telegram"></a>
@@ -92,10 +92,10 @@ flowchart LR
 Одна команда на **обоих** серверах:
 
 ```bash
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)"
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)"
 ```
 
-Установщик всегда ставит последний [релиз](https://github.com/CIAUB/fstunnel/releases/latest).
+Установщик всегда ставит последний [релиз](https://github.com/trojan504/fstunnel/releases/latest).
 Он скачивает бинарники для архитектуры сервера, скрипт ядра и юниты systemd, сверяет каждый файл
 с `SHA256SUMS` релиза и устанавливает только при совпадении всех хэшей. Повреждённый или изменённый
 файл прерывает установку, и в системе ничего не меняется.
@@ -108,7 +108,7 @@ sudo fstunnel
 туннели сохраняются. Без версии устанавливается последний стабильный релиз GitHub; черновики и предварительные релизы исключаются. Для конкретной версии:
 
 ```bash
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)" v0.2.1
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)" v0.2.1
 ```
 
 Также поддерживаются `bash install.sh v0.2.1` и `FSTUNNEL_VERSION=v0.2.1`. Явный аргумент версии имеет приоритет над переменной окружения.
@@ -325,7 +325,7 @@ journalctl -u fstunnel@t1 -u fstunnel-engine@t1 -n 50
 ## Сборка из исходников
 
 ```bash
-git clone https://github.com/CIAUB/fstunnel.git
+git clone https://github.com/trojan504/fstunnel.git
 cd fstunnel
 go test ./...
 sudo bash install.sh                  # сборка и установка из этой папки
@@ -349,7 +349,7 @@ fstunnel — свободное ПО под лицензией [AGPL-3.0](LICENS
 ## Сообщество
 
 - Новости, релизы и поддержка: Telegram-канал [@CiAUB_CH](https://t.me/CiAUB_CH)
-- Ошибки и предложения: [GitHub Issues](https://github.com/CIAUB/fstunnel/issues)
+- Ошибки и предложения: [GitHub Issues](https://github.com/trojan504/fstunnel/issues)
 
 <p align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=8B0000&height=100&section=footer" alt="Footer" />

@@ -196,21 +196,26 @@ func newRows(ps []probe, usable func(i int) bool) (rows []Result, dir, rev []int
 		rows = append(rows, row)
 		return i, ok && row.Skipped == ""
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if i, ok := add(m, m.Name, "DIRECT"); ok {
 			dir[i] = len(rows) - 1
 		}
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if m.Family == catalog.FamilyUDPCrypt || m.Name == "wireguard" {
 			if i, ok := add(m, "rev+"+m.Name, "REVERSE"); ok {
 				rev[i] = len(rows) - 1
 			}
 		}
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if frpMethod(m) {
 			rows = append(rows, Result{Method: "frp+" + m.Name, Family: string(m.Family), Mode: "REVERSE", Sent: Probes, Phase: "wait"})
+		}
+	}
+	for _, m := range catalog.Visible() {
+		if frpMethod(m) {
+			rows = append(rows, Result{Method: "tls13+" + m.Name, Family: string(m.Family), Mode: "REVERSE", Sent: Probes, Phase: "wait"})
 		}
 	}
 	return rows, dir, rev
@@ -535,6 +540,10 @@ func (r *Responder) ping(host net.IP, port int) {
 				_, _ = r.raw[p.proto].WriteTo(pkt, &net.IPAddr{IP: host})
 			}
 			r.mu.Lock()
+			if r.probeRow[i] < 0 {
+				r.mu.Unlock()
+				continue
+			}
 			if row := &r.rows[r.probeRow[i]]; row.Skipped == "" {
 				row.Phase, row.Sent = "echo", seq+1
 			}
@@ -613,7 +622,7 @@ type Result struct {
 
 // Only catalog-backed, bounded, printable results may reach terminal output.
 func validResult(r Result) bool {
-	base := strings.TrimPrefix(strings.TrimPrefix(r.Method, "frp+"), "rev+")
+	base := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(r.Method, "frp+"), "tls13+"), "rev+")
 	m, ok := catalog.LookupMethod(base)
 	if !ok || base != m.Name || (strings.HasPrefix(r.Method, "frp+") && !frpMethod(m)) || (strings.HasPrefix(r.Method, "rev+") && m.Family != catalog.FamilyUDPCrypt && m.Name != "wireguard") {
 		return false
@@ -666,6 +675,8 @@ func (r Result) LossPct() int {
 
 func (r Result) Status() string {
 	switch {
+	case r.Skipped == "" && r.Phase != "echo" && (r.UpMbps > 0 || r.DownMbps > 0):
+		return "ok"
 	case r.Phase == "echo", r.Phase != "" && r.Received == 0 && r.Skipped == "":
 		return "testing"
 	case r.Skipped != "":
@@ -712,7 +723,7 @@ func greHeader(proto uint16) []byte {
 // probes returns one probe per testable method, keyed by the catalog order.
 func probes() []probe {
 	var out []probe
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		m := m
 		var p probe
 		p.method = m.Name
@@ -914,7 +925,7 @@ func Run(ctx context.Context, l Link, progress Progress) ([]Result, error) {
 	// udpOpen is false when the iran responder's UDP port does not answer (closed or
 	// filtered). The UDP and IP-protocol phases need it, so they are skipped and the
 	// TCP (frp+) rows are still measured.
-	udpOpen := true
+	udpOpen := false
 	push := func(i int) {
 		if !udpOpen {
 			return
@@ -936,14 +947,14 @@ func Run(ctx context.Context, l Link, progress Progress) ([]Result, error) {
 	// stateful middlebox could treat as an open session.
 	var nonce [4]byte
 	_, _ = rand.Read(nonce[:])
-	if _, ok := s.controlMsg(ctx, ctlPing, 0, uint16(s.ping.LocalAddr().(*net.UDPAddr).Port), nonce, nil); !ok {
+	{
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		udpOpen = false
 		why := "UDP " + strconv.Itoa(l.UDPPort) + " closed on the iran server"
 		for i := range rows {
-			if !strings.HasPrefix(rows[i].Method, "frp+") && rows[i].Skipped == "" {
+			if !strings.HasPrefix(rows[i].Method, "frp+") && !strings.HasPrefix(rows[i].Method, "tls13+") && rows[i].Skipped == "" {
 				set(i, func(r *Result) { r.Skipped, r.Phase = why, "" })
 			}
 		}
@@ -1056,7 +1067,7 @@ func Run(ctx context.Context, l Link, progress Progress) ([]Result, error) {
 	// Phase 4: each frp+ method gets fresh TCP streams, its own method-specific
 	// payload, verified echoes and bidirectional throughput. No aggregate is copied.
 	for ci := range rows {
-		if !strings.HasPrefix(rows[ci].Method, "frp+") {
+		if !strings.HasPrefix(rows[ci].Method, "frp+") && !strings.HasPrefix(rows[ci].Method, "tls13+") {
 			continue
 		}
 		if ctx.Err() != nil {
@@ -1069,12 +1080,26 @@ func Run(ctx context.Context, l Link, progress Progress) ([]Result, error) {
 		notify()
 		push(ci)
 	}
-	return rows, ctx.Err()
+	return visibleRows(rows), ctx.Err()
+}
+
+// visibleRows keeps only the frp and TLS 1.3 carrier rows; plain probe rows stay internal.
+func visibleRows(rows []Result) []Result {
+	out := rows[:0:0]
+	for _, r := range rows {
+		if strings.HasPrefix(r.Method, "frp+") || strings.HasPrefix(r.Method, "tls13+") {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // These are carrier/encapsulation shape probes, not kernel tunnel integration tests.
 func measureCarrier(ctx context.Context, addr, method string) Result {
-	base := strings.TrimPrefix(method, "frp+")
+	if strings.HasPrefix(method, "tls13+") {
+		ctx = speedtest.WithTLS(ctx)
+	}
+	base := strings.TrimPrefix(strings.TrimPrefix(method, "frp+"), "tls13+")
 	spec, ok := catalog.LookupMethod(base)
 	r := Result{Method: method, Family: string(spec.Family), Mode: "REVERSE", Sent: Probes}
 	if !ok || !frpMethod(spec) {
@@ -1095,9 +1120,6 @@ func measureCarrier(ctx context.Context, addr, method string) Result {
 	rtts := speedtest.CarrierPayloadRTT(ctx, addr, prefix, Probes, probeInterval)
 	r.Received = len(rtts)
 	r.RTTms, r.JitterMs = stats(rtts)
-	if r.Received == 0 {
-		return r
-	}
 	down, up, err := speedtest.MeasureCarrierPayload(ctx, addr, prefix, 200*time.Millisecond, time.Second)
 	r.DownMbps, r.UpMbps = down, up
 	if err != nil {

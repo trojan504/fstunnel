@@ -3,9 +3,11 @@
 package speedtest
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -16,6 +18,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"fstunnel/pkg/tls13"
 )
 
 const (
@@ -42,6 +46,7 @@ func StartServer(addr string) (string, func(), error) {
 // ServeListener runs the echo + speed responder on a listener the caller
 // opened, until stop is called.
 func ServeListener(ln net.Listener) (string, func()) {
+	tlsCfg := serverTLSConfig()
 	// Bound unauthenticated sessions, including peers that never finish a hello.
 	var mu sync.Mutex
 	active := map[net.Conn]bool{}
@@ -63,7 +68,7 @@ func ServeListener(ln net.Listener) (string, func()) {
 			mu.Unlock()
 			go func() {
 				defer func() { mu.Lock(); delete(active, conn); mu.Unlock() }()
-				serveSpeedOrEcho(conn)
+				serveSpeedOrEcho(maybeTLSServer(conn, tlsCfg))
 			}()
 		}
 	}()
@@ -169,6 +174,10 @@ func MeasureSpeed4Streams(ctx context.Context, targetAddr string, warmup, durati
 }
 
 func runDirection4(parent context.Context, targetAddr string, dir byte, warmup, duration time.Duration) (float64, error) {
+	return runDirection4Dial(parent, func() (net.Conn, error) { return net.DialTimeout("tcp", targetAddr, 3*time.Second) }, dir, warmup, duration)
+}
+
+func runDirection4Dial(parent context.Context, dial func() (net.Conn, error), dir byte, warmup, duration time.Duration) (float64, error) {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	var wg sync.WaitGroup
@@ -180,7 +189,7 @@ func runDirection4(parent context.Context, targetAddr string, dir byte, warmup, 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			c, err := net.DialTimeout("tcp", targetAddr, 3*time.Second)
+			c, err := dial()
 			if err != nil {
 				ready <- err
 				return
@@ -396,29 +405,34 @@ func ProbeRTTAndLoss(targetAddr string, count int, timeout time.Duration) (minMs
 
 // Result is one link test between this server and target.
 type Result struct {
-	Target       string  `json:"target"`
-	MinMs        float64 `json:"min_ms"`
-	AvgMs        float64 `json:"avg_ms"`
-	MaxMs        float64 `json:"max_ms"`
-	JitterMs     float64 `json:"jitter_ms"`
-	LossPct      float64 `json:"loss_pct"`
-	DownloadMbps float64 `json:"download_mbps"`
-	UploadMbps   float64 `json:"upload_mbps"`
-	SpeedError   string  `json:"speed_error,omitempty"`
-	Recommended  string  `json:"recommended"`
-	Reason       string  `json:"reason"`
+	Target          string  `json:"target"`
+	MinMs           float64 `json:"min_ms"`
+	AvgMs           float64 `json:"avg_ms"`
+	MaxMs           float64 `json:"max_ms"`
+	JitterMs        float64 `json:"jitter_ms"`
+	LossPct         float64 `json:"loss_pct"`
+	DownloadMbps    float64 `json:"download_mbps"`
+	UploadMbps      float64 `json:"upload_mbps"`
+	SpeedError      string  `json:"speed_error,omitempty"`
+	TLSDownloadMbps float64 `json:"tls13_download_mbps"`
+	TLSUploadMbps   float64 `json:"tls13_upload_mbps"`
+	TLSError        string  `json:"tls13_error,omitempty"`
+	Recommended     string  `json:"recommended"`
+	Reason          string  `json:"reason"`
 }
 
 // Run probes target (host:port running StartServer) and measures throughput.
 func Run(ctx context.Context, target string, probes int) Result {
 	r := Result{Target: target}
 	r.MinMs, r.AvgMs, r.MaxMs, r.JitterMs, r.LossPct = ProbeRTTAndLoss(target, probes, 1500*time.Millisecond)
-	if r.LossPct < 100 {
-		var err error
-		r.DownloadMbps, r.UploadMbps, err = MeasureSpeed4Streams(ctx, target, ctSpeedWarmup, ctSpeedDuration)
-		if err != nil {
-			r.SpeedError = err.Error()
-		}
+	var err error
+	r.DownloadMbps, r.UploadMbps, err = MeasureSpeed4Streams(ctx, target, ctSpeedWarmup, ctSpeedDuration)
+	if err != nil {
+		r.SpeedError = err.Error()
+	}
+	r.TLSDownloadMbps, r.TLSUploadMbps, err = MeasureSpeed4StreamsTLS(ctx, target, ctSpeedWarmup, ctSpeedDuration)
+	if err != nil {
+		r.TLSError = err.Error()
 	}
 	r.Recommended, r.Reason = Recommend(r.LossPct, r.JitterMs)
 	return r
@@ -460,4 +474,57 @@ func Format(r Result) string {
 	row("Suggested", r.Recommended)
 	row("", r.Reason)
 	return b.String()
+}
+
+// serverTLSConfig returns a TLS 1.3 server config for the speed responder.
+func serverTLSConfig() *tls.Config {
+	cert, err := tls13.SelfSignedCert()
+	if err != nil {
+		return nil
+	}
+	return tls13.ServerConfig(cert)
+}
+
+type peekedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (p peekedConn) Read(b []byte) (int, error) { return p.r.Read(b) }
+
+// maybeTLSServer serves TLS 1.3 when the client opens with a TLS record (0x16),
+// and plain TCP otherwise, so one port answers both plain and TLS measurements.
+func maybeTLSServer(c net.Conn, cfg *tls.Config) net.Conn {
+	if cfg == nil {
+		return c
+	}
+	br := bufio.NewReader(c)
+	first, err := br.Peek(1)
+	if err != nil {
+		return peekedConn{Conn: c, r: br}
+	}
+	if first[0] != 0x16 {
+		return peekedConn{Conn: c, r: br}
+	}
+	return tls.Server(peekedConn{Conn: c, r: br}, cfg)
+}
+
+// MeasureSpeed4StreamsTLS is MeasureSpeed4Streams over TLS 1.3.
+func MeasureSpeed4StreamsTLS(ctx context.Context, targetAddr string, warmup, duration time.Duration) (downMbps, upMbps float64, err error) {
+	dial := func() (net.Conn, error) {
+		c, err := tls13.Dial(targetAddr, 3*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	downMbps, err = runDirection4Dial(ctx, dial, 'D', warmup, duration)
+	if err != nil {
+		return 0, 0, err
+	}
+	upMbps, err = runDirection4Dial(ctx, dial, 'U', warmup, duration)
+	if err != nil {
+		return downMbps, 0, err
+	}
+	return downMbps, upMbps, nil
 }

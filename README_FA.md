@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/CIAUB/fstunnel/releases/latest"><img src="https://img.shields.io/github/v/release/CIAUB/fstunnel?color=b91c1c&label=release" alt="Release"></a>
-  <a href="https://github.com/CIAUB/fstunnel/actions/workflows/ci.yml"><img src="https://github.com/CIAUB/fstunnel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/trojan504/fstunnel/releases/latest"><img src="https://img.shields.io/github/v/release/CIAUB/fstunnel?color=b91c1c&label=release" alt="Release"></a>
+  <a href="https://github.com/trojan504/fstunnel/actions/workflows/ci.yml"><img src="https://github.com/trojan504/fstunnel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white" alt="Go 1.22">
   <img src="https://img.shields.io/badge/Linux-amd64%20%7C%20arm64%20%7C%20armv7-333?logo=linux&logoColor=white" alt="Linux amd64 | arm64 | armv7">
   <a href="https://t.me/CiAUB_CH"><img src="https://img.shields.io/badge/Telegram-@CiAUB__CH-26A5E4?logo=telegram&logoColor=white" alt="Telegram"></a>
@@ -96,10 +96,10 @@ flowchart LR
 یک دستور، روی **هر دو** سرور:
 
 ```bash
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)"
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)"
 ```
 
-نصب‌کننده همیشه آخرین [Release](https://github.com/CIAUB/fstunnel/releases/latest) را نصب می‌کند.
+نصب‌کننده همیشه آخرین [Release](https://github.com/trojan504/fstunnel/releases/latest) را نصب می‌کند.
 باینری‌های مخصوص معماری سرور، اسکریپت کرنل و سرویس‌های systemd را دانلود می‌کند، هر فایل را با
 `SHA256SUMS` همان Release مقایسه می‌کند و فقط اگر همه یکی باشند نصب می‌کند. اگر فایلی خراب یا
 دستکاری‌شده باشد، نصب متوقف می‌شود و هیچ چیزی تغییر نمی‌کند.
@@ -112,7 +112,7 @@ sudo fstunnel
 می‌شوند. بدون شمارهٔ نسخه، آخرین ریلیز پایدار نصب می‌شود؛ نسخه‌های draft و pre-release انتخاب نمی‌شوند. برای نصب نسخهٔ مشخص:
 
 ```bash
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)" v0.2.1
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)" v0.2.1
 ```
 
 اجرای `bash install.sh v0.2.1` و متغیر `FSTUNNEL_VERSION=v0.2.1` هم پشتیبانی می‌شوند. آرگومان نسخه بر متغیر محیطی اولویت دارد.
@@ -323,7 +323,7 @@ journalctl -u fstunnel@t1 -u fstunnel-engine@t1 -n 50
 ## ساخت از سورس
 
 ```bash
-git clone https://github.com/CIAUB/fstunnel.git
+git clone https://github.com/trojan504/fstunnel.git
 cd fstunnel
 go test ./...
 sudo bash install.sh                  # build + install from this folder
@@ -347,7 +347,7 @@ fstunnel نرم‌افزار آزاد با لایسنس [AGPL-3.0](LICENSE) اس
 ## ارتباط
 
 - اخبار، نسخه‌های جدید و پشتیبانی: کانال تلگرام [@CiAUB_CH](https://t.me/CiAUB_CH)
-- گزارش باگ و درخواست امکانات: [GitHub Issues](https://github.com/CIAUB/fstunnel/issues)
+- گزارش باگ و درخواست امکانات: [GitHub Issues](https://github.com/trojan504/fstunnel/issues)
 
 </div>
 

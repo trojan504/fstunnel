@@ -25,6 +25,7 @@ type config struct {
 	tunnelID          uint16
 	padding           uint8
 	reverse           bool
+	tls               bool
 }
 
 func (c config) isPassive() bool {
@@ -94,6 +95,7 @@ func loadConfig(path string) (config, error) {
 		tunnelID: uint16(tid),
 		padding:  uint8(min(max(pad, 0), 255)),
 		reverse:  rev,
+		tls:      rev && env["CARRIER_TLS"] == "1",
 	}
 	if cfg.dev == "" || (cfg.remoteIP == "" && !cfg.isPassive()) || (cfg.role != "iran" && cfg.role != "kharej") {
 		return config{}, fmt.Errorf("%s: DEV, REMOTE_IP and ROLE are required", path)

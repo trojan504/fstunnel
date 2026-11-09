@@ -31,7 +31,7 @@ func TestEveryIPv4MethodHasAProbe(t *testing.T) {
 			t.Fatalf("%s: empty header", p.method)
 		}
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if !m.IPv6Underlay && !have[m.Name] {
 			t.Errorf("no probe for %s", m.Name)
 		}
@@ -144,19 +144,19 @@ func TestIranSideGetsSpeedsAndReport(t *testing.T) {
 	for _, r := range rows {
 		seen[r.Method] = r
 	}
-	for _, m := range []string{"dtls-1.3", "gre", "wireguard"} {
+	for _, m := range []string{"tls13+gre"} {
 		r := seen[m]
 		if r.Skipped != "" {
 			continue // raw protocols (gre) need root; CI runs without it
 		}
-		if r.Mode != "DIRECT" || r.Status() != "ok" || r.DownMbps <= 0 {
-			t.Fatalf("DIRECT %s (iran starts) not measured: %+v", m, r)
+		if r.Mode != "REVERSE" || r.Status() != "ok" || r.DownMbps <= 0 {
+			t.Fatalf("%s not measured: %+v", m, r)
 		}
 	}
-	if r := seen["rev+dtls-1.3"]; r.Mode != "REVERSE" || r.Status() != "ok" || r.DownMbps <= 0 {
-		t.Fatalf("rev+dtls-1.3 row not measured: %+v", r)
+	if r := seen["frp+gre"]; r.Mode != "REVERSE" || r.Status() != "ok" || r.DownMbps <= 0 {
+		t.Fatalf("frp+gre row not measured: %+v", r)
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if !frpMethod(m) {
 			continue
 		}
@@ -192,7 +192,7 @@ func TestFRPRowsDoNotRequireRawSockets(t *testing.T) {
 			t.Fatal("unusable direct probe mapped to another row")
 		}
 	}
-	for _, m := range catalog.Methods {
+	for _, m := range catalog.Visible() {
 		if frpMethod(m) && seen["frp+"+m.Name] != 1 {
 			t.Fatalf("missing/duplicate frp+%s", m.Name)
 		}

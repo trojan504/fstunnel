@@ -1,3 +1,9 @@
+## [3.0.8]
+
+### Changed
+- Published the 3.0.8 source snapshot.
+- Installer and update defaults now use trojan504/fstunnel; existing installations migrate the legacy default automatically.
+
 # Changelog
 
 ## [1.1.1]
@@ -42,7 +48,7 @@
 ### Upgrade note
 - Update both servers to use failover and the benchmark: the agent runs only on 1.0 or newer.
 
-[1.0.0]: https://github.com/CIAUB/fstunnel/compare/v0.4.1...v1.0.0
+[1.0.0]: https://github.com/trojan504/fstunnel/compare/v0.4.1...v1.0.0
 
 ## [0.4.1] - 2026-11-02
 
@@ -78,7 +84,7 @@
 ### Upgrade note
 - Traffic totals start counting from this version; what tunnels carried before the update is not in them.
 
-[0.4.0]: https://github.com/CIAUB/fstunnel/compare/v0.3.0...v0.4.0
+[0.4.0]: https://github.com/trojan504/fstunnel/compare/v0.3.0...v0.4.0
 
 ## [0.3.0] - 2026-11-01
 
@@ -88,7 +94,7 @@
 ### Upgrade note
 - Update the Iran server before the Kharej servers. A new Iran server still accepts old Kharej servers; an old Iran server cannot read traffic from a new Kharej server.
 
-[0.3.0]: https://github.com/CIAUB/fstunnel/compare/v0.2.7...v0.3.0
+[0.3.0]: https://github.com/trojan504/fstunnel/compare/v0.2.7...v0.3.0
 
 ## [0.2.7] - 2026-10-30
 
@@ -108,7 +114,7 @@
 - `GET /api/version` is authenticated, calls one fixed GitHub URL, and only returns a release link that starts with `https://github.com/`.
 - Telemetry history is mutex-guarded and bounded to 60 samples per tunnel; the inline CSP hashes stay generated from the LF-normalized style and script blocks.
 
-[0.2.7]: https://github.com/CIAUB/fstunnel/compare/v0.2.6...v0.2.7
+[0.2.7]: https://github.com/trojan504/fstunnel/compare/v0.2.6...v0.2.7
 
 ## [0.2.6] - 2026-10-30
 
@@ -120,7 +126,7 @@
 ### Security
 - Bounded login-limiter eviction, an 8 KiB setup-link cap, HSTS on HTTPS, and ownership/TTL bounds for test listeners and async test jobs.
 
-[0.2.6]: https://github.com/CIAUB/fstunnel/compare/v0.2.5...v0.2.6
+[0.2.6]: https://github.com/trojan504/fstunnel/compare/v0.2.5...v0.2.6
 
 ## [0.2.5] - 2026-10-30
 
@@ -131,7 +137,7 @@
 - Fail tunnel startup when port forwards are configured but iptables is unavailable.
 - Verify old systemd units are inactive before starting, restarting or deleting a tunnel.
 
-[0.2.5]: https://github.com/CIAUB/fstunnel/compare/v0.2.4...v0.2.5
+[0.2.5]: https://github.com/trojan504/fstunnel/compare/v0.2.4...v0.2.5
 
 ## [0.2.4] - 2026-10-30
 
@@ -146,7 +152,7 @@
 - Automated panel screenshot commits use the `CIAUB` identity instead of `github-actions[bot]`.
 - Repository checkout enforces LF line endings except for `.bat` files.
 
-[0.2.4]: https://github.com/CIAUB/fstunnel/compare/v0.2.3...v0.2.4
+[0.2.4]: https://github.com/trojan504/fstunnel/compare/v0.2.3...v0.2.4
 
 ## [0.2.3] - 2026-10-28
 
@@ -164,7 +170,7 @@
 - No version selects GitHub's latest stable release, excluding draft and pre-release entries. All assets remain pinned to one resolved tag and verified against SHA256SUMS.
 - Release titles contain only the tag/version.
 
-[0.2.3]: https://github.com/CIAUB/fstunnel/compare/v0.2.2...v0.2.3
+[0.2.3]: https://github.com/trojan504/fstunnel/compare/v0.2.2...v0.2.3
 
 ## [0.2.2] - 2026-10-28
 
@@ -173,7 +179,7 @@
 - Updated the panel URL examples in the English, Persian and Russian documentation.
 - Existing saved panel ports are preserved; change an existing installation through the terminal Web Panel menu if needed.
 
-[0.2.2]: https://github.com/CIAUB/fstunnel/compare/v0.2.1...v0.2.2
+[0.2.2]: https://github.com/trojan504/fstunnel/compare/v0.2.1...v0.2.2
 
 ## [0.2.1] - 2026-10-28
 
@@ -204,4 +210,4 @@
 ### Validation
 Go tests, vet, race checks, ShellCheck, Python automation tests, Chromium desktop/mobile flows, and isolated real-kernel GRE tests passed for the implementation. The GRE job verifies both directions after idle and reproduces the 0.2.0 regression before checking the fix.
 
-[0.2.1]: https://github.com/CIAUB/fstunnel/compare/v0.2.0...v0.2.1
+[0.2.1]: https://github.com/trojan504/fstunnel/compare/v0.2.0...v0.2.1
