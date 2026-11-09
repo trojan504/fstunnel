@@ -64,8 +64,7 @@ jobs:
           test -f "$src/go.mod"
           version="$(sed -n 's/^var Version = "\(.*\)"/\1/p' "$src/pkg/version/version.go")"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$version" = "${ARCHIVE#fstunnel-}"
-          version="${version%.zip}"
+          test "${version}.zip" = "${ARCHIVE#fstunnel-}"
           echo "Preparing FsTunnel $version"
           python3 - "$src" <<'PY'
           from pathlib import Path
@@ -141,9 +140,11 @@ jobs:
         working-directory: ${{ runner.temp }}/source/fstunnel-main
         run: bash scripts/build-release.sh "$VERSION"
       - name: Replace main with the validated source
+        env:
+          ARCHIVE: ${{ steps.source.outputs.archive }}
         run: |
           set -euo pipefail
-          rsync -a --delete --exclude='/.git/' --exclude='/.github/workflows/prepare-release.yml' \
+          rsync -a --delete --exclude='/.git/' --exclude='/dist/' --exclude='/.github/workflows/prepare-release.yml' \
             "$RUNNER_TEMP/source/fstunnel-main/" "$GITHUB_WORKSPACE/"
           rm -f "$ARCHIVE"
           git diff --check
