@@ -105,7 +105,6 @@ jobs:
               s = p.read_text(errors="strict")
               s = s.replace("github.com/CIAUB/fstunnel", "github.com/trojan504/fstunnel")
               s = s.replace("raw.githubusercontent.com/CIAUB/fstunnel", "raw.githubusercontent.com/trojan504/fstunnel")
-              s = s.replace("v3.0.0", "v3.0.8")
               p.write_text(s)
 
           workflow = root / ".github/workflows/release.yml"
