@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # fstunnel installer.
 #
-#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)"
+#   set -o pipefail && curl -fsSL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh | sudo bash
 #
 # A trailing version also works with bash -c (where it becomes $0):
-#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)" v0.2.1
+#   curl -fsSL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh | sudo bash -s -- v3.0.0
 # Downloads the latest stable GitHub Release by default and verifies SHA256SUMS.
 # Explicit arguments override FSTUNNEL_VERSION; source mode uses FSTUNNEL_LOCAL=1.
 # From a git checkout (sudo bash install.sh) it installs the local files instead.
