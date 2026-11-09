@@ -47,9 +47,16 @@ jobs:
           name = sys.argv[1]
           with zipfile.ZipFile(name) as z:
               files = z.namelist()
-              if not files or any(n.startswith("/") or "\\" in n or ".." in n.split("/") or not n.startswith("fstunnel-main/") for n in files):
+              bad = [n for n in files if n.startswith("/") or "\\" in n or ".." in n.split("/") or not n.startswith("fstunnel-main/")]
+              if not files or bad:
+                  print("Archive entries outside expected fstunnel-main/ directory:")
+                  print("\\n".join(repr(n) for n in bad[:40]))
+                  print("Top-level entries:")
+                  print("\\n".join(sorted({n.split("/")[0] for n in files})[:40]))
                   raise SystemExit("Archive contains an unexpected or unsafe path")
               if "fstunnel-main/pkg/version/version.go" not in files:
+                  print("Expected version file missing. First archive entries:")
+                  print("\\n".join(files[:40]))
                   raise SystemExit("Archive is missing pkg/version/version.go")
           PY
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
