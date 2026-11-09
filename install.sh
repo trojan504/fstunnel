@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # fstunnel installer.
 #
-#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)"
+#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)"
 #
 # A trailing version also works with bash -c (where it becomes $0):
-#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/CIAUB/fstunnel/main/install.sh)" v0.2.1
+#   sudo bash -c "$(curl -sL https://raw.githubusercontent.com/trojan504/fstunnel/main/install.sh)" v0.2.1
 # Downloads the latest stable GitHub Release by default and verifies SHA256SUMS.
 # Explicit arguments override FSTUNNEL_VERSION; source mode uses FSTUNNEL_LOCAL=1.
 # From a git checkout (sudo bash install.sh) it installs the local files instead.
 set -euo pipefail
 
-REPO="${FSTUNNEL_REPO:-CIAUB/fstunnel}"
+REPO="${FSTUNNEL_REPO:-trojan504/fstunnel}"
 GO_VERSION="${FSTUNNEL_GO_VERSION:-}"
 [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "invalid repository" >&2; exit 1; }
 
@@ -87,7 +87,7 @@ fetch_release() {
         # GitHub /releases/latest excludes draft and pre-release entries.
         # Resolve it once so every asset belongs to the same stable tag.
         local resolved
-        resolved="$(curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")"
+        resolved="$(curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")" || die "cannot access ${REPO}/releases/latest; make the repository public and publish a stable release first"
         VERSION="${resolved##*/}"
         [[ "$VERSION" =~ ^v[0-9][A-Za-z0-9_.-]*$ ]] || die "cannot resolve release tag"
         base="https://github.com/${REPO}/releases/download/${VERSION}"
