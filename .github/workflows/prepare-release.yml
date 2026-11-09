@@ -1,0 +1,166 @@
+name: Prepare and publish uploaded source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/prepare-release.yml"
+      - "fstunnel-*.zip"
+  workflow_dispatch:
+    inputs:
+      archive:
+        description: ZIP archive in the repository root
+        required: true
+        default: fstunnel-3.0.8.zip
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prepare-source-main
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Select and validate source archive
+        id: source
+        env:
+          ARCHIVE_INPUT: ${{ github.event.inputs.archive }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            archive="$ARCHIVE_INPUT"
+          else
+            archive="$(find . -maxdepth 1 -type f -name 'fstunnel-*.zip' -printf '%f\n' | sort -V | tail -n1)"
+          fi
+          [[ -n "$archive" && "$archive" != */* && "$archive" == fstunnel-*.zip && -f "$archive" ]]
+          python3 - "$archive" <<'PY'
+          import sys, zipfile
+          name = sys.argv[1]
+          with zipfile.ZipFile(name) as z:
+              files = z.namelist()
+              if not files or any(n.startswith("/") or "\\" in n or ".." in n.split("/") or not n.startswith("fstunnel-main/") for n in files):
+                  raise SystemExit("Archive contains an unexpected or unsafe path")
+              if "fstunnel-main/pkg/version/version.go" not in files:
+                  raise SystemExit("Archive is missing pkg/version/version.go")
+          PY
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - name: Extract source and apply repository migration
+        env:
+          ARCHIVE: ${{ steps.source.outputs.archive }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source"
+          unzip -q "$ARCHIVE" -d "$RUNNER_TEMP/source"
+          src="$RUNNER_TEMP/source/fstunnel-main"
+          test -f "$src/go.mod"
+          version="$(sed -n 's/^var Version = "\(.*\)"/\1/p' "$src/pkg/version/version.go")"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$version" = "${ARCHIVE#fstunnel-}"
+          version="${version%.zip}"
+          echo "Preparing FsTunnel $version"
+          python3 - "$src" <<'PY'
+          from pathlib import Path
+          import sys
+          root = Path(sys.argv[1])
+
+          def replace(path, old, new, expected=1):
+              p = root / path
+              s = p.read_text()
+              count = s.count(old)
+              if count < expected:
+                  raise SystemExit(f"{path}: expected at least {expected} occurrence(s), found {count}")
+              p.write_text(s.replace(old, new))
+
+          replace("install.sh", 'REPO="${FSTUNNEL_REPO:-CIAUB/fstunnel}"',
+                  'REPO="${FSTUNNEL_REPO:-trojan504/fstunnel}"')
+          replace("pkg/catalog/catalog.go",
+                  'DefaultGitHubRepo = "https://github.com/CIAUB/fstunnel"',
+                  'DefaultGitHubRepo = "https://github.com/trojan504/fstunnel"')
+
+          menu = root / "pkg/cli/menu.go"
+          s = menu.read_text()
+          needle = 'repo := strings.TrimRight(st.GitHubRepo, "/")\n'
+          migration = needle + '''\tif strings.TrimPrefix(repo, "https://github.com/") == "CIAUB/fstunnel" {
+          \t\tst.GitHubRepo = catalog.DefaultGitHubRepo
+          \t\tif err := st.Save(); err != nil {
+          \t\t\tErr("Could not migrate the saved GitHub repository: " + err.Error())
+          \t\t\treturn
+          \t\t}
+          \t\trepo = strings.TrimRight(st.GitHubRepo, "/")
+          \t}
+          '''
+          if s.count(needle) != 1:
+              raise SystemExit("menu.go: update repository insertion point not unique")
+          menu.write_text(s.replace(needle, migration))
+
+          for p in root.rglob("*.md"):
+              s = p.read_text(errors="strict")
+              s = s.replace("github.com/CIAUB/fstunnel", "github.com/trojan504/fstunnel")
+              s = s.replace("raw.githubusercontent.com/CIAUB/fstunnel", "raw.githubusercontent.com/trojan504/fstunnel")
+              s = s.replace("v3.0.0", "v3.0.8")
+              p.write_text(s)
+
+          workflow = root / ".github/workflows/release.yml"
+          if workflow.exists():
+              s = workflow.read_text().replace("default: v3.0.0", "default: v3.0.8")
+              workflow.write_text(s)
+
+          changelog = root / "CHANGELOG.md"
+          s = changelog.read_text()
+          if "## [3.0.8]" not in s:
+              s = "## [3.0.8]\n\n### Changed\n- Published the 3.0.8 source snapshot.\n- Installer and update defaults now use trojan504/fstunnel; existing installations migrate the legacy default automatically.\n\n" + s
+              changelog.write_text(s)
+
+          cache = root / "tests/__pycache__"
+          if cache.exists():
+              import shutil
+              shutil.rmtree(cache)
+          PY
+          test -z "$(find "$src" -type f -exec file {} + | grep -E 'ELF|executable.*binary' || true)"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Validate source
+        working-directory: ${{ runner.temp }}/source/fstunnel-main
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./... -count=1 -timeout=10m
+          go test -race ./cmd/fstunnel-engine ./pkg/tunnel -timeout=5m
+          shellcheck install.sh scripts/*.sh
+          python3 -m unittest discover -s tests -v
+      - name: Build release assets
+        working-directory: ${{ runner.temp }}/source/fstunnel-main
+        run: bash scripts/build-release.sh "$VERSION"
+      - name: Replace main with the validated source
+        run: |
+          set -euo pipefail
+          rsync -a --delete --exclude='/.git/' --exclude='/.github/workflows/prepare-release.yml' \
+            "$RUNNER_TEMP/source/fstunnel-main/" "$GITHUB_WORKSPACE/"
+          rm -f "$ARCHIVE"
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish FsTunnel $VERSION source"
+            git push origin main
+          fi
+      - name: Publish verified release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: main
+          name: FsTunnel v${{ env.VERSION }}
+          files: ${{ runner.temp }}/source/fstunnel-main/dist/*
+          overwrite_files: true
+          make_latest: true
+          generate_release_notes: true
